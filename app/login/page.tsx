@@ -2,11 +2,16 @@
 
 import { signIn, useSession } from "next-auth/react";
 import { useRouter } from "next/navigation";
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 
 export default function LoginPage() {
   const { status } = useSession();
   const router = useRouter();
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [mode, setMode] = useState<"login" | "signup">("login");
+  const [error, setError] = useState("");
+  const [loading, setLoading] = useState(false);
 
   useEffect(() => {
     if (status === "authenticated") {
@@ -22,6 +27,31 @@ export default function LoginPage() {
     );
   }
 
+  const handleEmailAuth = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setError("");
+    setLoading(true);
+    try {
+      const res = await signIn("firebase", {
+        email,
+        password,
+        mode: mode === "signup" ? "signup" : "login",
+        redirect: false,
+        callbackUrl: "/",
+      });
+      if (res?.error) {
+        setError(mapFirebaseError(res.error));
+      } else if (res?.ok) {
+        router.replace("/");
+        router.refresh();
+      }
+    } catch (err: any) {
+      setError(err?.message || "Something went wrong");
+    } finally {
+      setLoading(false);
+    }
+  };
+
   return (
     <div
       style={{
@@ -30,6 +60,7 @@ export default function LoginPage() {
         alignItems: "center",
         justifyContent: "center",
         background: "#f3f4f6",
+        padding: "1rem",
       }}
     >
       <div
@@ -44,9 +75,105 @@ export default function LoginPage() {
         }}
       >
         <h1 style={{ fontSize: "1.875rem", fontWeight: "bold", marginBottom: "0.5rem" }}>Welcome</h1>
-        <p style={{ color: "#6b7280", marginBottom: "2rem" }}>
-          Sign in once — stay logged in until logout
+        <p style={{ color: "#6b7280", marginBottom: "1.5rem" }}>
+          Email, Google, or GitHub — stay logged in until logout
         </p>
+
+        {/* Email / Password */}
+        <form onSubmit={handleEmailAuth} style={{ textAlign: "left", marginBottom: "1.25rem" }}>
+          <label style={{ fontSize: "0.8rem", color: "#4b5563" }}>Email</label>
+          <input
+            type="email"
+            required
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            placeholder="you@example.com"
+            style={inputStyle}
+          />
+          <label style={{ fontSize: "0.8rem", color: "#4b5563" }}>Password</label>
+          <input
+            type="password"
+            required
+            minLength={6}
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            placeholder="Min 6 characters"
+            style={inputStyle}
+          />
+
+          {error && (
+            <p style={{ color: "#dc2626", fontSize: "0.8rem", marginBottom: "0.75rem" }}>{error}</p>
+          )}
+
+          <button
+            type="submit"
+            disabled={loading}
+            style={{
+              width: "100%",
+              padding: "0.875rem",
+              background: "#2563eb",
+              color: "white",
+              border: "none",
+              borderRadius: "0.5rem",
+              fontWeight: 600,
+              cursor: loading ? "wait" : "pointer",
+              marginBottom: "0.75rem",
+            }}
+          >
+            {loading
+              ? "Please wait..."
+              : mode === "login"
+                ? "Login with Email"
+                : "Create Account"}
+          </button>
+
+          <p style={{ fontSize: "0.85rem", color: "#6b7280", textAlign: "center" }}>
+            {mode === "login" ? (
+              <>
+                No account?{" "}
+                <button
+                  type="button"
+                  onClick={() => {
+                    setMode("signup");
+                    setError("");
+                  }}
+                  style={linkBtn}
+                >
+                  Sign up
+                </button>
+              </>
+            ) : (
+              <>
+                Already have an account?{" "}
+                <button
+                  type="button"
+                  onClick={() => {
+                    setMode("login");
+                    setError("");
+                  }}
+                  style={linkBtn}
+                >
+                  Login
+                </button>
+              </>
+            )}
+          </p>
+        </form>
+
+        <div
+          style={{
+            display: "flex",
+            alignItems: "center",
+            gap: "0.5rem",
+            marginBottom: "1rem",
+            color: "#9ca3af",
+            fontSize: "0.75rem",
+          }}
+        >
+          <div style={{ flex: 1, height: 1, background: "#e5e7eb" }} />
+          OR
+          <div style={{ flex: 1, height: 1, background: "#e5e7eb" }} />
+        </div>
 
         <button
           onClick={() => signIn("google", { callbackUrl: "/" })}
@@ -118,4 +245,37 @@ export default function LoginPage() {
       </div>
     </div>
   );
+}
+
+const inputStyle: React.CSSProperties = {
+  width: "100%",
+  padding: "0.65rem 0.75rem",
+  marginTop: 4,
+  marginBottom: 12,
+  border: "1px solid #d1d5db",
+  borderRadius: "0.5rem",
+  fontSize: "1rem",
+  boxSizing: "border-box",
+};
+
+const linkBtn: React.CSSProperties = {
+  background: "none",
+  border: "none",
+  color: "#2563eb",
+  cursor: "pointer",
+  fontWeight: 600,
+  padding: 0,
+};
+
+function mapFirebaseError(code: string) {
+  const c = code.toUpperCase();
+  if (c.includes("EMAIL_EXISTS")) return "Email already registered. Please login.";
+  if (c.includes("EMAIL_NOT_FOUND")) return "No account with this email.";
+  if (c.includes("INVALID_PASSWORD") || c.includes("INVALID_LOGIN"))
+    return "Wrong email or password.";
+  if (c.includes("WEAK_PASSWORD")) return "Password should be at least 6 characters.";
+  if (c.includes("INVALID_EMAIL")) return "Invalid email address.";
+  if (c.includes("TOO_MANY_ATTEMPTS")) return "Too many attempts. Try later.";
+  if (c.includes("USER_DISABLED")) return "This account is disabled.";
+  return code.replace(/CredentialsSignin/i, "Login failed").slice(0, 120);
 }

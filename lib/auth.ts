@@ -1,6 +1,42 @@
 import type { NextAuthOptions } from "next-auth";
 import GitHubProvider from "next-auth/providers/github";
 import GoogleProvider from "next-auth/providers/google";
+import CredentialsProvider from "next-auth/providers/credentials";
+
+const FIREBASE_API_KEY =
+  process.env.NEXT_PUBLIC_FIREBASE_API_KEY || "AIzaSyCc2EE3QS27fF9Jhd-h-yqAeMhGsZgWmwk";
+
+async function firebaseAuth(
+  mode: "signInWithPassword" | "signUp",
+  email: string,
+  password: string
+) {
+  const res = await fetch(
+    `https://identitytoolkit.googleapis.com/v1/accounts:${mode}?key=${FIREBASE_API_KEY}`,
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        email,
+        password,
+        returnSecureToken: true,
+      }),
+    }
+  );
+  const data = await res.json();
+  if (!res.ok) {
+    const msg = data?.error?.message || "Firebase auth failed";
+    throw new Error(msg);
+  }
+  return data as {
+    idToken: string;
+    refreshToken: string;
+    expiresIn: string;
+    localId: string;
+    email: string;
+    displayName?: string;
+  };
+}
 
 export const authOptions: NextAuthOptions = {
   providers: [
@@ -17,6 +53,36 @@ export const authOptions: NextAuthOptions = {
           access_type: "offline",
           response_type: "code",
         },
+      },
+    }),
+    CredentialsProvider({
+      id: "firebase",
+      name: "Email",
+      credentials: {
+        email: { label: "Email", type: "email" },
+        password: { label: "Password", type: "password" },
+        mode: { label: "Mode", type: "text" },
+      },
+      async authorize(credentials) {
+        if (!credentials?.email || !credentials?.password) {
+          throw new Error("Email and password required");
+        }
+        const mode =
+          credentials.mode === "signup" ? "signUp" : "signInWithPassword";
+        try {
+          const data = await firebaseAuth(mode, credentials.email, credentials.password);
+          return {
+            id: data.localId,
+            email: data.email,
+            name: data.displayName || data.email.split("@")[0],
+            // custom fields passed to jwt via user
+            accessToken: data.idToken,
+            refreshToken: data.refreshToken,
+            expiresIn: data.expiresIn,
+          } as any;
+        } catch (e: any) {
+          throw new Error(e?.message || "Auth failed");
+        }
       },
     }),
   ],
@@ -40,6 +106,16 @@ export const authOptions: NextAuthOptions = {
         token.providerAccountId = account.providerAccountId;
         token.expiresAt = account.expires_at;
         token.idToken = account.id_token;
+      }
+      // Firebase credentials login
+      if (user && (user as any).accessToken) {
+        token.accessToken = (user as any).accessToken;
+        token.refreshToken = (user as any).refreshToken;
+        token.provider = "firebase";
+        token.providerAccountId = user.id;
+        const expiresIn = parseInt((user as any).expiresIn || "3600", 10);
+        token.expiresAt = Math.floor(Date.now() / 1000) + expiresIn;
+        token.idToken = (user as any).accessToken;
       }
       if (user) {
         token.name = user.name;
