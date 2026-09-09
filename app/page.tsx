@@ -28,7 +28,7 @@ export default function Home() {
         }}
       >
         <h1 style={{ fontSize: "1.875rem", fontWeight: "bold" }}>OAuth Demo App</h1>
-        <p style={{ color: "#6b7280" }}>GitHub + Google login. Session stays until you logout.</p>
+        <p style={{ color: "#6b7280" }}>GitHub + Google + Email login. Session stays until you logout.</p>
         <Link
           href="/login"
           style={{
@@ -62,6 +62,7 @@ export default function Home() {
           }}
         >
           {[
+            { href: "/editor", title: "Code Editor", desc: "Files, run, live preview" },
             { href: "/account", title: "Account", desc: "Login provider & client info" },
             { href: "/profile", title: "Profile", desc: "Your name, email, avatar" },
             { href: "/workspace", title: "Workspace", desc: "Your workspace area" },
@@ -96,7 +97,8 @@ export default function Home() {
             color: "#065f46",
           }}
         >
-          Logged in via <strong>{session.provider || "unknown"}</strong> · Session persists ~30 days until Logout.
+          Logged in via <strong>{session.provider || "unknown"}</strong> · Session persists ~30 days until
+          Logout.
         </div>
       </div>
     </AuthGuard>
