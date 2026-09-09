@@ -4,12 +4,18 @@ import { useSession } from "next-auth/react";
 import { useState } from "react";
 import AuthGuard from "../components/AuthGuard";
 
+function mask(value?: string) {
+  if (!value || value.length < 12) return value || "—";
+  return value.slice(0, 6) + "••••••••••••" + value.slice(-4);
+}
+
 export default function TokensPage() {
   const { data: session, update } = useSession();
   const [copied, setCopied] = useState<string | null>(null);
+  const [revealed, setRevealed] = useState(false);
 
   const copy = async (label: string, value?: string) => {
-    if (!value) return;
+    if (!value || !revealed) return;
     await navigator.clipboard.writeText(value);
     setCopied(label);
     setTimeout(() => setCopied(null), 2000);
@@ -17,35 +23,48 @@ export default function TokensPage() {
 
   const refreshSession = async () => {
     await update();
-    alert("Session / JWT refreshed from server.");
+    alert("Session refreshed.");
   };
 
   return (
     <AuthGuard>
       <div style={{ maxWidth: 800, margin: "2rem auto", padding: "0 1.5rem" }}>
         <h1 style={{ fontSize: "1.5rem", fontWeight: "bold", marginBottom: "0.5rem" }}>
-          Access Tokens & JWT
+          Session & Tokens
         </h1>
         <p style={{ color: "#6b7280", marginBottom: "1rem" }}>
-          Provider access token, refresh token, ID token, and session JWT details. Session is stored
-          in a secure cookie and lasts ~30 days.
+          Tokens stay in an encrypted HTTP-only session cookie. Full values are hidden by default.
         </p>
 
         <div
           style={{
-            background: "#fef3c7",
-            border: "1px solid #fbbf24",
+            background: "#ecfdf5",
+            border: "1px solid #6ee7b7",
             borderRadius: "0.5rem",
             padding: "0.75rem 1rem",
             marginBottom: "1.5rem",
             fontSize: "0.85rem",
-            color: "#92400e",
+            color: "#065f46",
           }}
         >
-          ⚠️ Tokens are sensitive. Do not share them publicly. This page is for demo / debugging only.
+          Session is encrypted (JWT in secure cookie). Do not share tokens. Reveal only on a trusted
+          device.
         </div>
 
         <div style={{ display: "flex", gap: "0.75rem", marginBottom: "1.5rem", flexWrap: "wrap" }}>
+          <button
+            onClick={() => setRevealed((v) => !v)}
+            style={{
+              padding: "0.5rem 1rem",
+              background: revealed ? "#b91c1c" : "#111827",
+              color: "white",
+              border: "none",
+              borderRadius: "0.375rem",
+              cursor: "pointer",
+            }}
+          >
+            {revealed ? "Hide sensitive values" : "Reveal tokens (private)"}
+          </button>
           <button
             onClick={refreshSession}
             style={{
@@ -57,73 +76,40 @@ export default function TokensPage() {
               cursor: "pointer",
             }}
           >
-            Regenerate / Refresh JWT Session
+            Refresh session
           </button>
         </div>
 
+        <TokenBlock title="Login Provider" value={session?.provider || "—"} />
+        <TokenBlock title="Account ID" value={session?.providerAccountId || "—"} />
         <TokenBlock
-          title="Login Provider"
-          value={session?.provider || "—"}
-          onCopy={() => copy("provider", session?.provider)}
-          copied={copied === "provider"}
-        />
-
-        <TokenBlock
-          title="Provider Account ID"
-          value={session?.providerAccountId || "—"}
-          onCopy={() => copy("pid", session?.providerAccountId)}
-          copied={copied === "pid"}
-        />
-
-        <TokenBlock
-          title={`${session?.provider === "google" ? "Google" : session?.provider === "github" ? "GitHub" : "Provider"} Access Token`}
-          value={session?.accessToken || "Not available in session"}
-          onCopy={() => copy("access", session?.accessToken)}
+          title="Access / ID Token"
+          value={
+            revealed
+              ? session?.accessToken || "Not available"
+              : mask(session?.accessToken)
+          }
+          onCopy={revealed ? () => copy("access", session?.accessToken) : undefined}
           copied={copied === "access"}
         />
-
         <TokenBlock
-          title="Refresh Token (Google offline / if issued)"
-          value={session?.refreshToken || "Not issued or not stored"}
-          onCopy={() => copy("refresh", session?.refreshToken)}
+          title="Refresh Token"
+          value={
+            revealed
+              ? session?.refreshToken || "Not issued"
+              : mask(session?.refreshToken)
+          }
+          onCopy={revealed ? () => copy("refresh", session?.refreshToken) : undefined}
           copied={copied === "refresh"}
         />
-
-        <TokenBlock
-          title="ID Token (OpenID — usually Google)"
-          value={session?.idToken || "Not available"}
-          onCopy={() => copy("id", session?.idToken)}
-          copied={copied === "id"}
-        />
-
         <TokenBlock
           title="Token Expiry"
           value={
             session?.expiresAt
-              ? `${new Date(session.expiresAt * 1000).toLocaleString()} (unix: ${session.expiresAt})`
-              : "Long-lived or not set by provider"
+              ? new Date(session.expiresAt * 1000).toLocaleString()
+              : "Long-lived / not set"
           }
         />
-
-        <div
-          style={{
-            marginTop: "1.5rem",
-            padding: "1rem",
-            background: "#f3f4f6",
-            borderRadius: "0.5rem",
-            fontSize: "0.85rem",
-            color: "#374151",
-          }}
-        >
-          <strong>How it works:</strong>
-          <ul style={{ marginTop: 8, paddingLeft: 18, lineHeight: 1.7 }}>
-            <li>NextAuth uses <strong>JWT strategy</strong> — encrypted session JWT in HTTP-only cookie</li>
-            <li>Access token from GitHub/Google is saved inside that JWT on login</li>
-            <li>Cookie maxAge = 30 days → refresh / new tab pe login nahi maanga jata</li>
-            <li>Logout clears the cookie</li>
-            <li>“Regenerate / Refresh JWT Session” re-reads token from server</li>
-          </ul>
-        </div>
       </div>
     </AuthGuard>
   );
@@ -151,7 +137,7 @@ function TokenBlock({
         }}
       >
         <span style={{ fontSize: "0.8rem", fontWeight: 600, color: "#4b5563" }}>{title}</span>
-        {onCopy && value && value !== "—" && !value.startsWith("Not") && (
+        {onCopy && (
           <button
             onClick={onCopy}
             style={{
