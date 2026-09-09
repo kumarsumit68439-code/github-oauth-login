@@ -1,6 +1,7 @@
 import type { NextAuthOptions } from "next-auth";
 import GitHubProvider from "next-auth/providers/github";
 import GoogleProvider from "next-auth/providers/google";
+import FacebookProvider from "next-auth/providers/facebook";
 import CredentialsProvider from "next-auth/providers/credentials";
 
 const FIREBASE_API_KEY =
@@ -55,6 +56,10 @@ export const authOptions: NextAuthOptions = {
         },
       },
     }),
+    FacebookProvider({
+      clientId: process.env.FACEBOOK_CLIENT_ID as string,
+      clientSecret: process.env.FACEBOOK_CLIENT_SECRET as string,
+    }),
     CredentialsProvider({
       id: "firebase",
       name: "Email",
@@ -75,7 +80,6 @@ export const authOptions: NextAuthOptions = {
             id: data.localId,
             email: data.email,
             name: data.displayName || data.email.split("@")[0],
-            // custom fields passed to jwt via user
             accessToken: data.idToken,
             refreshToken: data.refreshToken,
             expiresIn: data.expiresIn,
@@ -107,7 +111,6 @@ export const authOptions: NextAuthOptions = {
         token.expiresAt = account.expires_at;
         token.idToken = account.id_token;
       }
-      // Firebase credentials login
       if (user && (user as any).accessToken) {
         token.accessToken = (user as any).accessToken;
         token.refreshToken = (user as any).refreshToken;
