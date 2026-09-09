@@ -10,11 +10,11 @@ export default function LoginPage() {
 
   useEffect(() => {
     if (status === "authenticated") {
-      router.push("/");
+      router.replace("/");
     }
   }, [status, router]);
 
-  if (status === "loading") {
+  if (status === "loading" || status === "authenticated") {
     return (
       <div style={{ display: "flex", alignItems: "center", justifyContent: "center", minHeight: "100vh" }}>
         Loading...
@@ -44,9 +44,10 @@ export default function LoginPage() {
         }}
       >
         <h1 style={{ fontSize: "1.875rem", fontWeight: "bold", marginBottom: "0.5rem" }}>Welcome</h1>
-        <p style={{ color: "#6b7280", marginBottom: "2rem" }}>Sign in to continue</p>
+        <p style={{ color: "#6b7280", marginBottom: "2rem" }}>
+          Sign in once — stay logged in until logout
+        </p>
 
-        {/* Google Button */}
         <button
           onClick={() => signIn("google", { callbackUrl: "/" })}
           style={{
@@ -87,7 +88,6 @@ export default function LoginPage() {
           Continue with Google
         </button>
 
-        {/* GitHub Button */}
         <button
           onClick={() => signIn("github", { callbackUrl: "/" })}
           style={{
