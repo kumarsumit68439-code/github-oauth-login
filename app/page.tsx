@@ -3,6 +3,7 @@
 import { useSession } from "next-auth/react";
 import Link from "next/link";
 import AuthGuard from "./components/AuthGuard";
+import AdBanner from "./components/AdBanner";
 
 export default function Home() {
   const { data: session, status } = useSession();
@@ -25,10 +26,13 @@ export default function Home() {
           justifyContent: "center",
           minHeight: "80vh",
           gap: "1.5rem",
+          padding: "0 1rem",
         }}
       >
         <h1 style={{ fontSize: "1.875rem", fontWeight: "bold" }}>OAuth Demo App</h1>
-        <p style={{ color: "#6b7280" }}>GitHub + Google + Email login. Session stays until you logout.</p>
+        <p style={{ color: "#6b7280", textAlign: "center" }}>
+          GitHub + Google + Email login. Session stays until you logout.
+        </p>
         <Link
           href="/login"
           style={{
@@ -42,6 +46,9 @@ export default function Home() {
         >
           Go to Login
         </Link>
+        <div style={{ width: "100%", maxWidth: 720, marginTop: 8 }}>
+          <AdBanner format="horizontal" label="Sponsored" />
+        </div>
       </div>
     );
   }
@@ -50,9 +57,11 @@ export default function Home() {
     <AuthGuard>
       <div style={{ maxWidth: 900, margin: "2rem auto", padding: "0 1.5rem" }}>
         <h1 style={{ fontSize: "1.75rem", fontWeight: "bold", marginBottom: "0.5rem" }}>Homepage</h1>
-        <p style={{ color: "#6b7280", marginBottom: "1.5rem" }}>
+        <p style={{ color: "#6b7280", marginBottom: "1.25rem" }}>
           You are logged in. Session is saved — page refresh will not ask login again.
         </p>
+
+        <AdBanner format="horizontal" label="In-feed ad" style={{ marginBottom: 20 }} />
 
         <div
           style={{
@@ -67,6 +76,7 @@ export default function Home() {
             { href: "/profile", title: "Profile", desc: "Your name, email, avatar" },
             { href: "/workspace", title: "Workspace", desc: "Your workspace area" },
             { href: "/tokens", title: "Access Tokens", desc: "JWT, access & refresh tokens" },
+            { href: "/backend", title: "Backend", desc: "User data & projects" },
           ].map((c) => (
             <Link
               key={c.href}
@@ -85,6 +95,15 @@ export default function Home() {
               <div style={{ fontSize: "0.875rem", color: "#6b7280" }}>{c.desc}</div>
             </Link>
           ))}
+        </div>
+
+        <div style={{ marginTop: 24 }}>
+          <AdBanner
+            format="rectangle"
+            label="Rectangle ad"
+            slot={process.env.NEXT_PUBLIC_ADSENSE_SLOT_RECT}
+            style={{ minHeight: 250 }}
+          />
         </div>
 
         <div
