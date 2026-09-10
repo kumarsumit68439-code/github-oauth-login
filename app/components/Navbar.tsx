@@ -7,6 +7,7 @@ import { signOut, useSession } from "next-auth/react";
 const links = [
   { href: "/", label: "Home" },
   { href: "/editor", label: "Code Editor" },
+  { href: "/projects", label: "Projects" },
   { href: "/account", label: "Account" },
   { href: "/profile", label: "Profile" },
   { href: "/workspace", label: "Workspace" },
@@ -39,7 +40,8 @@ export default function Navbar() {
             key={l.href}
             href={l.href}
             style={{
-              color: pathname === l.href || pathname.startsWith(l.href + "/") ? "#93c5fd" : "#e5e7eb",
+              color:
+                pathname === l.href || pathname.startsWith(l.href + "/") ? "#93c5fd" : "#e5e7eb",
               textDecoration: "none",
               fontWeight: pathname === l.href ? 600 : 400,
               fontSize: "0.9rem",
