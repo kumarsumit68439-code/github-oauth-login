@@ -2,6 +2,16 @@ import { NextRequest, NextResponse } from "next/server";
 
 export const runtime = "nodejs";
 
+const BLOCKED = new Set([
+  "llama-3.1-70b-versatile",
+  "llama3-70b-8192",
+  "llama3-8b-8192",
+  "gemma2-9b-it",
+  "mixtral-8x7b-32768",
+]);
+
+const FALLBACK = "llama-3.1-8b-instant";
+
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
@@ -28,7 +38,10 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Prompt required" }, { status: 400 });
     }
 
-    const selectedModel = model || "llama-3.1-8b-instant";
+    let selectedModel = (model || FALLBACK).trim();
+    if (BLOCKED.has(selectedModel)) {
+      selectedModel = FALLBACK;
+    }
 
     const system = `You are an expert web developer AI agent.
 Generate clean, working code for a browser code editor that supports HTML, CSS, and JavaScript.
@@ -65,7 +78,14 @@ Rules:
     if (!res.ok) {
       const msg =
         data?.error?.message || data?.message || `Groq error ${res.status}`;
-      return NextResponse.json({ error: msg }, { status: res.status });
+      return NextResponse.json(
+        {
+          error: msg,
+          model_tried: selectedModel,
+          hint: "Click Load models from Groq and pick a live model",
+        },
+        { status: res.status }
+      );
     }
 
     const text = data?.choices?.[0]?.message?.content || "";
@@ -74,6 +94,7 @@ Rules:
       model: selectedModel,
       content: text,
       usage: data?.usage || null,
+      endpoint: "https://api.groq.com/openai/v1/chat/completions",
     });
   } catch (e: any) {
     return NextResponse.json(
