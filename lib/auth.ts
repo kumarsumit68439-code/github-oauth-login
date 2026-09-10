@@ -3,6 +3,7 @@ import GitHubProvider from "next-auth/providers/github";
 import GoogleProvider from "next-auth/providers/google";
 import FacebookProvider from "next-auth/providers/facebook";
 import CredentialsProvider from "next-auth/providers/credentials";
+import type { OAuthConfig } from "next-auth/providers/oauth";
 
 const FIREBASE_API_KEY =
   process.env.NEXT_PUBLIC_FIREBASE_API_KEY || "AIzaSyCc2EE3QS27fF9Jhd-h-yqAeMhGsZgWmwk";
@@ -39,57 +40,100 @@ async function firebaseAuth(
   };
 }
 
+/** OpenAI / Sign in with ChatGPT (requires registered OAuth client) */
+function OpenAIProvider(options: {
+  clientId: string;
+  clientSecret: string;
+}): OAuthConfig<any> {
+  return {
+    id: "openai",
+    name: "ChatGPT",
+    type: "oauth",
+    clientId: options.clientId,
+    clientSecret: options.clientSecret,
+    authorization: {
+      url: "https://auth.openai.com/authorize",
+      params: {
+        scope: "openid profile email offline_access",
+        response_type: "code",
+      },
+    },
+    token: "https://auth0.openai.com/oauth/token",
+    userinfo: "https://auth0.openai.com/userinfo",
+    checks: ["pkce", "state"],
+    profile(profile: any) {
+      return {
+        id: profile.sub,
+        name: profile.name || profile.nickname || profile.email,
+        email: profile.email,
+        image: profile.picture,
+      };
+    },
+  };
+}
+
+const providers: NextAuthOptions["providers"] = [
+  GitHubProvider({
+    clientId: process.env.GITHUB_ID as string,
+    clientSecret: process.env.GITHUB_SECRET as string,
+  }),
+  GoogleProvider({
+    clientId: process.env.GOOGLE_CLIENT_ID as string,
+    clientSecret: process.env.GOOGLE_CLIENT_SECRET as string,
+    authorization: {
+      params: {
+        prompt: "consent",
+        access_type: "offline",
+        response_type: "code",
+      },
+    },
+  }),
+  FacebookProvider({
+    clientId: process.env.FACEBOOK_CLIENT_ID as string,
+    clientSecret: process.env.FACEBOOK_CLIENT_SECRET as string,
+  }),
+  CredentialsProvider({
+    id: "firebase",
+    name: "Email",
+    credentials: {
+      email: { label: "Email", type: "email" },
+      password: { label: "Password", type: "password" },
+      mode: { label: "Mode", type: "text" },
+    },
+    async authorize(credentials) {
+      if (!credentials?.email || !credentials?.password) {
+        throw new Error("Email and password required");
+      }
+      const mode =
+        credentials.mode === "signup" ? "signUp" : "signInWithPassword";
+      try {
+        const data = await firebaseAuth(mode, credentials.email, credentials.password);
+        return {
+          id: data.localId,
+          email: data.email,
+          name: data.displayName || data.email.split("@")[0],
+          accessToken: data.idToken,
+          refreshToken: data.refreshToken,
+          expiresIn: data.expiresIn,
+        } as any;
+      } catch (e: any) {
+        throw new Error(e?.message || "Auth failed");
+      }
+    },
+  }),
+];
+
+if (process.env.OPENAI_CLIENT_ID && process.env.OPENAI_CLIENT_SECRET) {
+  providers.push(
+    OpenAIProvider({
+      clientId: process.env.OPENAI_CLIENT_ID,
+      clientSecret: process.env.OPENAI_CLIENT_SECRET,
+    })
+  );
+}
+
 export const authOptions: NextAuthOptions = {
-  providers: [
-    GitHubProvider({
-      clientId: process.env.GITHUB_ID as string,
-      clientSecret: process.env.GITHUB_SECRET as string,
-    }),
-    GoogleProvider({
-      clientId: process.env.GOOGLE_CLIENT_ID as string,
-      clientSecret: process.env.GOOGLE_CLIENT_SECRET as string,
-      authorization: {
-        params: {
-          prompt: "consent",
-          access_type: "offline",
-          response_type: "code",
-        },
-      },
-    }),
-    FacebookProvider({
-      clientId: process.env.FACEBOOK_CLIENT_ID as string,
-      clientSecret: process.env.FACEBOOK_CLIENT_SECRET as string,
-    }),
-    CredentialsProvider({
-      id: "firebase",
-      name: "Email",
-      credentials: {
-        email: { label: "Email", type: "email" },
-        password: { label: "Password", type: "password" },
-        mode: { label: "Mode", type: "text" },
-      },
-      async authorize(credentials) {
-        if (!credentials?.email || !credentials?.password) {
-          throw new Error("Email and password required");
-        }
-        const mode =
-          credentials.mode === "signup" ? "signUp" : "signInWithPassword";
-        try {
-          const data = await firebaseAuth(mode, credentials.email, credentials.password);
-          return {
-            id: data.localId,
-            email: data.email,
-            name: data.displayName || data.email.split("@")[0],
-            accessToken: data.idToken,
-            refreshToken: data.refreshToken,
-            expiresIn: data.expiresIn,
-          } as any;
-        } catch (e: any) {
-          throw new Error(e?.message || "Auth failed");
-        }
-      },
-    }),
-  ],
+  providers,
   pages: {
     signIn: "/login",
   },
