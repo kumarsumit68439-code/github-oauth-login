@@ -255,7 +255,10 @@ export default function EditorPage() {
       if (f) setActiveId(f.id);
     } else blocks.forEach(applyOne);
     saveFiles(next);
-    setPreviewHtml(buildPreviewHtml(next));
+    const html = buildPreviewHtml(next);
+    setPreviewHtml(html);
+    setSavedMsg("Applied + preview running");
+    setTimeout(() => setSavedMsg(""), 1500);
   };
 
   const generateCode = async () => {
@@ -292,8 +295,9 @@ export default function EditorPage() {
       setAiRaw(data.content || "");
       if (autoApply && data.content) {
         applyBlocksToEditor(data.content);
-        setSavedMsg("AI code applied");
-        setTimeout(() => setSavedMsg(""), 2000);
+      } else if (data.content) {
+        setSavedMsg("Generated — click Apply to editor");
+        setTimeout(() => setSavedMsg(""), 2500);
       }
     } catch (e: any) {
       setAiError(e?.message || "Network error");
@@ -666,7 +670,7 @@ export default function EditorPage() {
                 background: "#0f172a",
               }}
             >
-              Preview
+              Preview (auto-runs after AI apply)
             </div>
             <iframe
               title="preview"
