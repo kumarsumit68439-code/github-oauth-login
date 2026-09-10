@@ -19,7 +19,7 @@ const securityHeaders = [
       "style-src 'self' 'unsafe-inline'",
       "img-src 'self' data: https: blob:",
       "font-src 'self' data:",
-      "connect-src 'self' https://identitytoolkit.googleapis.com https://securetoken.googleapis.com https://accounts.google.com https://github.com https://api.github.com https://www.facebook.com https://graph.facebook.com",
+      "connect-src 'self' https://identitytoolkit.googleapis.com https://securetoken.googleapis.com https://accounts.google.com https://github.com https://api.github.com https://www.facebook.com https://graph.facebook.com https://api.groq.com",
       "frame-ancestors 'none'",
       "base-uri 'self'",
       "form-action 'self' https://accounts.google.com https://github.com https://www.facebook.com",

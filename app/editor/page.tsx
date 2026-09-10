@@ -11,6 +11,17 @@ type CodeFile = {
 };
 
 const STORAGE_KEY = "code-editor-files-v1";
+const GROQ_KEY_STORAGE = "groq-api-key-v1";
+const GROQ_MODEL_STORAGE = "groq-model-v1";
+
+const GROQ_MODELS = [
+  { id: "llama-3.1-8b-instant", label: "Llama 3.1 8B Instant (fast/free)" },
+  { id: "llama-3.3-70b-versatile", label: "Llama 3.3 70B Versatile" },
+  { id: "llama-3.1-70b-versatile", label: "Llama 3.1 70B Versatile" },
+  { id: "gemma2-9b-it", label: "Gemma2 9B IT" },
+  { id: "mixtral-8x7b-32768", label: "Mixtral 8x7B" },
+  { id: "qwen/qwen3-32b", label: "Qwen3 32B" },
+];
 
 const defaultFiles: CodeFile[] = [
   {
@@ -88,7 +99,6 @@ function buildPreviewHtml(files: CodeFile[]) {
     .map((f) => f.content)
     .join("\n");
 
-  // Inline linked css/js for iframe (no separate requests)
   html = html.replace(
     /<link[^>]*href=["']([^"']+\.css)["'][^>]*>/gi,
     () => `<style>\n${css}\n</style>`
@@ -99,10 +109,7 @@ function buildPreviewHtml(files: CodeFile[]) {
   );
 
   if (!html.includes("<style>") && css) {
-    html = html.replace(
-      /<\/head>/i,
-      `<style>\n${css}\n</style>\n</head>`
-    );
+    html = html.replace(/<\/head>/i, `<style>\n${css}\n</style>\n</head>`);
   }
   if (js) {
     if (/<\/body>/i.test(html)) {
@@ -114,14 +121,45 @@ function buildPreviewHtml(files: CodeFile[]) {
   return html;
 }
 
+/** Extract code from markdown fences */
+function extractCodeBlocks(text: string): { lang: string; code: string; fileHint?: string }[] {
+  const blocks: { lang: string; code: string; fileHint?: string }[] = [];
+  const re = /```([\w.-]*)\n([\s\S]*?)```/g;
+  let m;
+  while ((m = re.exec(text)) !== null) {
+    let code = m[2].replace(/\n$/, "");
+    let fileHint: string | undefined;
+    const first = code.split("\n")[0] || "";
+    const fileMatch = first.match(/(?:\/\/|#)\s*file:\s*(.+)/i);
+    if (fileMatch) {
+      fileHint = fileMatch[1].trim();
+      code = code.split("\n").slice(1).join("\n");
+    }
+    blocks.push({ lang: (m[1] || "").toLowerCase(), code, fileHint });
+  }
+  if (!blocks.length && text.trim()) {
+    blocks.push({ lang: "", code: text.trim() });
+  }
+  return blocks;
+}
+
 export default function EditorPage() {
   const [files, setFiles] = useState<CodeFile[]>(defaultFiles);
   const [activeId, setActiveId] = useState("1");
   const [previewHtml, setPreviewHtml] = useState("");
   const [savedMsg, setSavedMsg] = useState("");
   const [fullscreen, setFullscreen] = useState(false);
-  const previewRef = useRef<HTMLIFrameElement>(null);
   const previewPaneRef = useRef<HTMLDivElement>(null);
+
+  // AI state
+  const [groqKey, setGroqKey] = useState("");
+  const [groqModel, setGroqModel] = useState(GROQ_MODELS[0].id);
+  const [aiPrompt, setAiPrompt] = useState("");
+  const [aiLoading, setAiLoading] = useState(false);
+  const [aiError, setAiError] = useState("");
+  const [aiRaw, setAiRaw] = useState("");
+  const [autoApply, setAutoApply] = useState(true);
+  const [showAi, setShowAi] = useState(true);
 
   useEffect(() => {
     try {
@@ -133,6 +171,10 @@ export default function EditorPage() {
           setActiveId(parsed[0].id);
         }
       }
+      const k = localStorage.getItem(GROQ_KEY_STORAGE);
+      if (k) setGroqKey(k);
+      const m = localStorage.getItem(GROQ_MODEL_STORAGE);
+      if (m) setGroqModel(m);
     } catch {
       /* ignore */
     }
@@ -143,22 +185,25 @@ export default function EditorPage() {
     [files, activeId]
   );
 
-  const saveFiles = useCallback(
-    (next: CodeFile[]) => {
-      setFiles(next);
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(next));
-      setSavedMsg("Saved");
-      setTimeout(() => setSavedMsg(""), 1500);
-    },
-    []
-  );
+  const saveFiles = useCallback((next: CodeFile[]) => {
+    setFiles(next);
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(next));
+    setSavedMsg("Saved");
+    setTimeout(() => setSavedMsg(""), 1500);
+  }, []);
+
+  const saveGroqKey = () => {
+    localStorage.setItem(GROQ_KEY_STORAGE, groqKey.trim());
+    localStorage.setItem(GROQ_MODEL_STORAGE, groqModel);
+    setSavedMsg("API key & model saved");
+    setTimeout(() => setSavedMsg(""), 2000);
+  };
 
   const updateContent = (content: string) => {
     if (!active) return;
-    const next = files.map((f) =>
-      f.id === active.id ? { ...f, content } : f
+    setFiles((prev) =>
+      prev.map((f) => (f.id === active.id ? { ...f, content } : f))
     );
-    setFiles(next);
   };
 
   const runPreview = () => {
@@ -170,10 +215,97 @@ export default function EditorPage() {
   };
 
   useEffect(() => {
-    // initial preview
     setPreviewHtml(buildPreviewHtml(files));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  const applyBlocksToEditor = (text: string) => {
+    const blocks = extractCodeBlocks(text);
+    if (!blocks.length) return;
+
+    let next = [...files];
+
+    const applyOne = (block: { lang: string; code: string; fileHint?: string }) => {
+      let targetName = block.fileHint;
+      if (!targetName) {
+        if (block.lang.includes("html")) targetName = "index.html";
+        else if (block.lang.includes("css")) targetName = "styles.css";
+        else if (block.lang.includes("javascript") || block.lang === "js")
+          targetName = "script.js";
+        else if (active) targetName = active.name;
+        else targetName = "index.html";
+      }
+
+      const existing = next.find((f) => f.name === targetName);
+      if (existing) {
+        next = next.map((f) =>
+          f.name === targetName ? { ...f, content: block.code } : f
+        );
+      } else {
+        next.push({
+          id: String(Date.now() + Math.random()),
+          name: targetName,
+          language: langFromName(targetName),
+          content: block.code,
+        });
+      }
+      return targetName;
+    };
+
+    if (blocks.length === 1) {
+      const name = applyOne(blocks[0]);
+      const f = next.find((x) => x.name === name);
+      if (f) setActiveId(f.id);
+    } else {
+      blocks.forEach(applyOne);
+    }
+
+    saveFiles(next);
+    setPreviewHtml(buildPreviewHtml(next));
+  };
+
+  const generateCode = async () => {
+    setAiError("");
+    setAiRaw("");
+    if (!groqKey.trim()) {
+      setAiError("Pehle Groq API key daalo aur Save karo");
+      return;
+    }
+    if (!aiPrompt.trim()) {
+      setAiError("Prompt likho — kya code chahiye");
+      return;
+    }
+    setAiLoading(true);
+    try {
+      const res = await fetch("/api/groq", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          apiKey: groqKey.trim(),
+          model: groqModel,
+          prompt: aiPrompt.trim(),
+          fileName: active?.name,
+          language: active?.language,
+          currentCode: active?.content,
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        setAiError(data?.error || "Groq request failed");
+        return;
+      }
+      setAiRaw(data.content || "");
+      if (autoApply && data.content) {
+        applyBlocksToEditor(data.content);
+        setSavedMsg("AI code applied");
+        setTimeout(() => setSavedMsg(""), 2000);
+      }
+    } catch (e: any) {
+      setAiError(e?.message || "Network error");
+    } finally {
+      setAiLoading(false);
+    }
+  };
 
   const addFile = () => {
     const name = prompt("File name (e.g. app.js, extra.css)");
@@ -219,8 +351,7 @@ export default function EditorPage() {
   const openNewTab = () => {
     const html = buildPreviewHtml(files);
     const blob = new Blob([html], { type: "text/html" });
-    const url = URL.createObjectURL(blob);
-    window.open(url, "_blank", "noopener,noreferrer");
+    window.open(URL.createObjectURL(blob), "_blank", "noopener,noreferrer");
   };
 
   const toggleFullscreen = async () => {
@@ -262,7 +393,6 @@ export default function EditorPage() {
           color: "#e2e8f0",
         }}
       >
-        {/* Toolbar */}
         <div
           style={{
             display: "flex",
@@ -278,92 +408,217 @@ export default function EditorPage() {
           <button style={{ ...btn, background: "#16a34a", borderColor: "#16a34a" }} onClick={runPreview}>
             ▶ Run
           </button>
-          <button
-            style={btn}
-            onClick={() => {
-              saveFiles(files);
-            }}
-          >
-            💾 Save
+          <button style={btn} onClick={() => saveFiles(files)}>
+            💾 Save files
           </button>
           <button style={btn} onClick={openNewTab}>
-            ↗ Preview new tab
+            ↗ New tab
           </button>
           <button style={btn} onClick={toggleFullscreen}>
-            {fullscreen ? "Exit full screen" : "⛶ Full screen preview"}
+            {fullscreen ? "Exit full screen" : "⛶ Full screen"}
           </button>
           <button style={btn} onClick={addFile}>
-            + New file
+            + File
           </button>
-          {savedMsg && (
-            <span style={{ color: "#4ade80", fontSize: 13 }}>{savedMsg}</span>
-          )}
+          <button
+            style={{ ...btn, background: showAi ? "#7c3aed" : "#1e293b", borderColor: "#7c3aed" }}
+            onClick={() => setShowAi((v) => !v)}
+          >
+            ✦ AI Agent
+          </button>
+          {savedMsg && <span style={{ color: "#4ade80", fontSize: 13 }}>{savedMsg}</span>}
         </div>
 
-        {/* Main */}
         <div style={{ display: "flex", flex: 1, minHeight: 0 }}>
-          {/* File tree */}
+          {/* Files */}
           <aside
             style={{
-              width: 200,
+              width: 180,
               borderRight: "1px solid #1e293b",
               background: "#0f172a",
               overflowY: "auto",
               padding: "0.5rem",
             }}
           >
-            <div style={{ fontSize: 11, color: "#64748b", marginBottom: 8, paddingLeft: 4 }}>
-              FILES
-            </div>
+            <div style={{ fontSize: 11, color: "#64748b", marginBottom: 8 }}>FILES</div>
             {files.map((f) => (
-              <div
-                key={f.id}
-                style={{
-                  display: "flex",
-                  alignItems: "center",
-                  gap: 4,
-                  marginBottom: 2,
-                }}
-              >
+              <div key={f.id} style={{ display: "flex", gap: 4, marginBottom: 2 }}>
                 <button
                   onClick={() => setActiveId(f.id)}
                   style={{
                     flex: 1,
                     textAlign: "left",
-                    padding: "0.4rem 0.5rem",
+                    padding: "0.35rem 0.45rem",
                     borderRadius: 6,
                     border: "none",
                     background: f.id === activeId ? "#1e3a5f" : "transparent",
                     color: f.id === activeId ? "#93c5fd" : "#cbd5e1",
                     cursor: "pointer",
-                    fontSize: 13,
+                    fontSize: 12,
                     fontFamily: "ui-monospace, monospace",
                   }}
                 >
                   {f.name}
                 </button>
-                <button
-                  title="Rename"
-                  onClick={() => renameFile(f.id)}
-                  style={{ ...btn, padding: "0.2rem 0.35rem", fontSize: 11 }}
-                >
+                <button onClick={() => renameFile(f.id)} style={{ ...btn, padding: "0.15rem 0.3rem", fontSize: 10 }}>
                   ✎
                 </button>
                 <button
-                  title="Delete"
                   onClick={() => deleteFile(f.id)}
-                  style={{
-                    ...btn,
-                    padding: "0.2rem 0.35rem",
-                    fontSize: 11,
-                    color: "#f87171",
-                  }}
+                  style={{ ...btn, padding: "0.15rem 0.3rem", fontSize: 10, color: "#f87171" }}
                 >
                   ×
                 </button>
               </div>
             ))}
           </aside>
+
+          {/* AI panel */}
+          {showAi && (
+            <aside
+              style={{
+                width: 280,
+                borderRight: "1px solid #1e293b",
+                background: "#0f172a",
+                display: "flex",
+                flexDirection: "column",
+                padding: "0.6rem",
+                gap: 8,
+                overflowY: "auto",
+              }}
+            >
+              <div style={{ fontSize: 12, fontWeight: 600, color: "#c4b5fd" }}>Groq AI Agent</div>
+
+              <label style={{ fontSize: 11, color: "#94a3b8" }}>Groq API Key</label>
+              <input
+                type="password"
+                value={groqKey}
+                onChange={(e) => setGroqKey(e.target.value)}
+                placeholder="gsk_..."
+                style={{
+                  width: "100%",
+                  padding: "0.45rem",
+                  borderRadius: 6,
+                  border: "1px solid #334155",
+                  background: "#020617",
+                  color: "#e2e8f0",
+                  fontSize: 12,
+                  boxSizing: "border-box",
+                }}
+              />
+
+              <label style={{ fontSize: 11, color: "#94a3b8" }}>Model</label>
+              <select
+                value={groqModel}
+                onChange={(e) => setGroqModel(e.target.value)}
+                style={{
+                  width: "100%",
+                  padding: "0.45rem",
+                  borderRadius: 6,
+                  border: "1px solid #334155",
+                  background: "#020617",
+                  color: "#e2e8f0",
+                  fontSize: 12,
+                }}
+              >
+                {GROQ_MODELS.map((m) => (
+                  <option key={m.id} value={m.id}>
+                    {m.label}
+                  </option>
+                ))}
+              </select>
+
+              <button style={{ ...btn, background: "#4f46e5", borderColor: "#4f46e5" }} onClick={saveGroqKey}>
+                💾 Save API key & model
+              </button>
+
+              <label style={{ fontSize: 11, color: "#94a3b8" }}>Prompt</label>
+              <textarea
+                value={aiPrompt}
+                onChange={(e) => setAiPrompt(e.target.value)}
+                placeholder="e.g. Make a dark login card with CSS animation"
+                rows={4}
+                style={{
+                  width: "100%",
+                  padding: "0.45rem",
+                  borderRadius: 6,
+                  border: "1px solid #334155",
+                  background: "#020617",
+                  color: "#e2e8f0",
+                  fontSize: 12,
+                  resize: "vertical",
+                  boxSizing: "border-box",
+                }}
+              />
+
+              <label style={{ fontSize: 11, color: "#94a3b8", display: "flex", gap: 6, alignItems: "center" }}>
+                <input
+                  type="checkbox"
+                  checked={autoApply}
+                  onChange={(e) => setAutoApply(e.target.checked)}
+                />
+                Auto-apply to editor
+              </label>
+
+              <button
+                style={{
+                  ...btn,
+                  background: aiLoading ? "#475569" : "#7c3aed",
+                  borderColor: "#7c3aed",
+                  opacity: aiLoading ? 0.8 : 1,
+                }}
+                disabled={aiLoading}
+                onClick={generateCode}
+              >
+                {aiLoading ? "Generating…" : "✦ Generate code"}
+              </button>
+
+              {aiError && (
+                <div style={{ color: "#f87171", fontSize: 11, wordBreak: "break-word" }}>{aiError}</div>
+              )}
+
+              {aiRaw && (
+                <>
+                  <div style={{ fontSize: 11, color: "#94a3b8" }}>AI response</div>
+                  <pre
+                    style={{
+                      margin: 0,
+                      padding: 8,
+                      background: "#020617",
+                      borderRadius: 6,
+                      fontSize: 10,
+                      maxHeight: 160,
+                      overflow: "auto",
+                      whiteSpace: "pre-wrap",
+                      wordBreak: "break-word",
+                    }}
+                  >
+                    {aiRaw.slice(0, 2000)}
+                    {aiRaw.length > 2000 ? "…" : ""}
+                  </pre>
+                  <button
+                    style={{ ...btn, background: "#059669", borderColor: "#059669" }}
+                    onClick={() => applyBlocksToEditor(aiRaw)}
+                  >
+                    Apply to editor
+                  </button>
+                </>
+              )}
+
+              <p style={{ fontSize: 10, color: "#64748b", lineHeight: 1.4 }}>
+                Free key:{" "}
+                <a
+                  href="https://console.groq.com/keys"
+                  target="_blank"
+                  rel="noreferrer"
+                  style={{ color: "#93c5fd" }}
+                >
+                  console.groq.com/keys
+                </a>
+                . Key browser localStorage mein save hoti hai. Server `/api/groq` → Groq API call.
+              </p>
+            </aside>
+          )}
 
           {/* Editor */}
           <div style={{ flex: 1, display: "flex", flexDirection: "column", minWidth: 0 }}>
@@ -417,25 +672,16 @@ export default function EditorPage() {
                 borderBottom: "1px solid #1e293b",
                 fontSize: 12,
                 color: "#94a3b8",
-                display: "flex",
-                justifyContent: "space-between",
                 background: "#0f172a",
               }}
             >
-              <span>Preview</span>
-              <span style={{ color: "#64748b" }}>Live iframe</span>
+              Preview
             </div>
             <iframe
-              ref={previewRef}
               title="preview"
               sandbox="allow-scripts allow-modals allow-forms allow-same-origin"
               srcDoc={previewHtml}
-              style={{
-                flex: 1,
-                width: "100%",
-                border: "none",
-                background: "white",
-              }}
+              style={{ flex: 1, width: "100%", border: "none", background: "white" }}
             />
           </div>
         </div>
