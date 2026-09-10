@@ -23,24 +23,35 @@ const DEFAULT_GROQ_MODELS = [
   { id: "qwen/qwen3.6-27b", label: "Qwen3.6 27B" },
 ];
 
+const BLOCKED_MODELS = [
+  "llama-3.1-70b-versatile",
+  "gemma2-9b-it",
+  "mixtral-8x7b-32768",
+  "llama3-70b-8192",
+  "llama3-8b-8192",
+];
+
 const defaultFiles: CodeFile[] = [
   {
     id: "1",
     name: "index.html",
     language: "html",
-    content: `<!DOCTYPE html>\n<html lang=\"en\">\n<head>\n  <meta charset=\"UTF-8\" />\n  <meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0\" />\n  <title>Preview</title>\n  <link rel=\"stylesheet\" href=\"styles.css\" />\n</head>\n<body>\n  <h1>Hello World</h1>\n  <p>Edit files and click <strong>Run</strong> to preview.</p>\n  <button id=\"btn\">Click me</button>\n  <script src=\"script.js\"></script>\n</body>\n</html>`,
+    content:
+      "<!DOCTYPE html>\n<html lang=\"en\">\n<head>\n  <meta charset=\"UTF-8\" />\n  <meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0\" />\n  <title>Preview</title>\n  <link rel=\"stylesheet\" href=\"styles.css\" />\n</head>\n<body>\n  <h1>Hello World</h1>\n  <p>Edit files and click <strong>Run</strong> to preview.</p>\n  <button id=\"btn\">Click me</button>\n  <script src=\"script.js\"></script>\n</body>\n</html>",
   },
   {
     id: "2",
     name: "styles.css",
     language: "css",
-    content: `body {\n  font-family: system-ui, sans-serif;\n  max-width: 640px;\n  margin: 2rem auto;\n  padding: 0 1rem;\n  background: #0f172a;\n  color: #e2e8f0;\n}\nh1 { color: #38bdf8; }\nbutton {\n  background: #2563eb;\n  color: white;\n  border: none;\n  padding: 0.6rem 1.2rem;\n  border-radius: 8px;\n  cursor: pointer;\n}\nbutton:hover { background: #1d4ed8; }`,
+    content:
+      "body {\n  font-family: system-ui, sans-serif;\n  max-width: 640px;\n  margin: 2rem auto;\n  padding: 0 1rem;\n  background: #0f172a;\n  color: #e2e8f0;\n}\nh1 { color: #38bdf8; }\nbutton {\n  background: #2563eb;\n  color: white;\n  border: none;\n  padding: 0.6rem 1.2rem;\n  border-radius: 8px;\n  cursor: pointer;\n}\nbutton:hover { background: #1d4ed8; }",
   },
   {
     id: "3",
     name: "script.js",
     language: "javascript",
-    content: `document.getElementById(\"btn\")?.addEventListener(\"click\", () => {\n  alert(\"JS is running in preview!\");\n});`,
+    content:
+      'document.getElementById("btn")?.addEventListener("click", () => {\n  alert("JS is running in preview!");\n});',
   },
 ];
 
@@ -56,56 +67,36 @@ function buildPreviewHtml(files: CodeFile[]) {
     files.find((f) => f.name === "index.html") ||
     files.find((f) => f.language === "html");
   let html = htmlFile?.content || "<h1>No HTML file</h1>";
-
-  const css = files
-    .filter((f) => f.language === "css")
-    .map((f) => f.content)
-    .join("\n");
-  const js = files
-    .filter((f) => f.language === "javascript")
-    .map((f) => f.content)
-    .join("\n");
-
-  html = html.replace(
-    /<link[^>]*href=[\"']([^\"']+\\.css)[\"'][^>]*>/gi,
-    () => `<style>\n${css}\n</style>`
-  );
-  html = html.replace(
-    /<script[^>]*src=[\"']([^\"']+\\.js)[\"'][^>]*><\\/script>/gi,
-    () => ""
-  );
-
+  const css = files.filter((f) => f.language === "css").map((f) => f.content).join("\n");
+  const js = files.filter((f) => f.language === "javascript").map((f) => f.content).join("\n");
+  html = html.replace(/<link[^>]*href=["']([^"']+\.css)["'][^>]*>/gi, () => `<style>\n${css}\n</style>`);
+  html = html.replace(/<script[^>]*src=["']([^"']+\.js)["'][^>]*><\/script>/gi, () => "");
   if (!html.includes("<style>") && css) {
-    html = html.replace(/<\\/head>/i, `<style>\n${css}\n</style>\n</head>`);
+    html = html.replace(/<\/head>/i, `<style>\n${css}\n</style>\n</head>`);
   }
   if (js) {
-    if (/<\\/body>/i.test(html)) {
-      html = html.replace(/<\\/body>/i, `<script>\n${js}\n</script>\n</body>`);
-    } else {
-      html += `\n<script>\n${js}\n</script>`;
-    }
+    if (/<\/body>/i.test(html)) html = html.replace(/<\/body>/i, `<script>\n${js}\n</script>\n</body>`);
+    else html += `\n<script>\n${js}\n</script>`;
   }
   return html;
 }
 
 function extractCodeBlocks(text: string): { lang: string; code: string; fileHint?: string }[] {
   const blocks: { lang: string; code: string; fileHint?: string }[] = [];
-  const re = /```([\\w.-]*)\n([\\s\\S]*?)```/g;
+  const re = /```([\w.-]*)\n([\s\S]*?)```/g;
   let m;
   while ((m = re.exec(text)) !== null) {
     let code = m[2].replace(/\n$/, "");
     let fileHint: string | undefined;
     const first = code.split("\n")[0] || "";
-    const fileMatch = first.match(/(?:\\/\\/|#)\\s*file:\\s*(.+)/i);
+    const fileMatch = first.match(/(?:\/\/|#)\s*file:\s*(.+)/i);
     if (fileMatch) {
       fileHint = fileMatch[1].trim();
       code = code.split("\n").slice(1).join("\n");
     }
     blocks.push({ lang: (m[1] || "").toLowerCase(), code, fileHint });
   }
-  if (!blocks.length && text.trim()) {
-    blocks.push({ lang: "", code: text.trim() });
-  }
+  if (!blocks.length && text.trim()) blocks.push({ lang: "", code: text.trim() });
   return blocks;
 }
 
@@ -141,7 +132,11 @@ export default function EditorPage() {
       const k = localStorage.getItem(GROQ_KEY_STORAGE);
       if (k) setGroqKey(k);
       const m = localStorage.getItem(GROQ_MODEL_STORAGE);
-      if (m) setGroqModel(m);
+      if (m && !BLOCKED_MODELS.includes(m)) setGroqModel(m);
+      else if (m && BLOCKED_MODELS.includes(m)) {
+        localStorage.setItem(GROQ_MODEL_STORAGE, "llama-3.1-8b-instant");
+        setGroqModel("llama-3.1-8b-instant");
+      }
     } catch {
       /* ignore */
     }
@@ -159,16 +154,10 @@ export default function EditorPage() {
     setTimeout(() => setSavedMsg(""), 1500);
   }, []);
 
-  const saveGroqKey = () => {
-    localStorage.setItem(GROQ_KEY_STORAGE, groqKey.trim());
-    localStorage.setItem(GROQ_MODEL_STORAGE, groqModel);
-    setSavedMsg("API key & model saved");
-    setTimeout(() => setSavedMsg(""), 2000);
-  };
-
-  const loadModelsFromGroq = async () => {
+  const loadModelsFromGroq = async (key?: string) => {
     setAiError("");
-    if (!groqKey.trim()) {
+    const apiKey = (key ?? groqKey).trim();
+    if (!apiKey) {
       setAiError("Pehle API key daalo");
       return;
     }
@@ -177,7 +166,7 @@ export default function EditorPage() {
       const res = await fetch("/api/groq/models", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ apiKey: groqKey.trim() }),
+        body: JSON.stringify({ apiKey }),
       });
       const data = await res.json();
       if (!res.ok) {
@@ -186,20 +175,32 @@ export default function EditorPage() {
       }
       const list = (data.models || []).map((id: string) => ({ id, label: id }));
       if (!list.length) {
-        setAiError("No chat models returned for this key");
+        setAiError("No models returned for this key");
         return;
       }
       setGroqModels(list);
-      if (!list.some((m: { id: string }) => m.id === groqModel)) {
+      if (!list.some((x: { id: string }) => x.id === groqModel)) {
         setGroqModel(list[0].id);
+        localStorage.setItem(GROQ_MODEL_STORAGE, list[0].id);
       }
-      setSavedMsg(`${list.length} models loaded`);
-      setTimeout(() => setSavedMsg(""), 2000);
+      setSavedMsg(`${list.length} Groq models loaded (free + paid)`);
+      setTimeout(() => setSavedMsg(""), 2500);
     } catch (e: any) {
       setAiError(e?.message || "Network error loading models");
     } finally {
       setModelsLoading(false);
     }
+  };
+
+  const saveGroqKey = () => {
+    localStorage.setItem(GROQ_KEY_STORAGE, groqKey.trim());
+    const model = BLOCKED_MODELS.includes(groqModel)
+      ? "llama-3.1-8b-instant"
+      : groqModel;
+    if (model !== groqModel) setGroqModel(model);
+    localStorage.setItem(GROQ_MODEL_STORAGE, model);
+    setSavedMsg("Saved — loading all models…");
+    void loadModelsFromGroq(groqKey.trim());
   };
 
   const updateContent = (content: string) => {
@@ -225,25 +226,19 @@ export default function EditorPage() {
   const applyBlocksToEditor = (text: string) => {
     const blocks = extractCodeBlocks(text);
     if (!blocks.length) return;
-
     let next = [...files];
-
     const applyOne = (block: { lang: string; code: string; fileHint?: string }) => {
       let targetName = block.fileHint;
       if (!targetName) {
         if (block.lang.includes("html")) targetName = "index.html";
         else if (block.lang.includes("css")) targetName = "styles.css";
-        else if (block.lang.includes("javascript") || block.lang === "js")
-          targetName = "script.js";
+        else if (block.lang.includes("javascript") || block.lang === "js") targetName = "script.js";
         else if (active) targetName = active.name;
         else targetName = "index.html";
       }
-
       const existing = next.find((f) => f.name === targetName);
       if (existing) {
-        next = next.map((f) =>
-          f.name === targetName ? { ...f, content: block.code } : f
-        );
+        next = next.map((f) => (f.name === targetName ? { ...f, content: block.code } : f));
       } else {
         next.push({
           id: String(Date.now() + Math.random()),
@@ -254,15 +249,11 @@ export default function EditorPage() {
       }
       return targetName;
     };
-
     if (blocks.length === 1) {
       const name = applyOne(blocks[0]);
       const f = next.find((x) => x.name === name);
       if (f) setActiveId(f.id);
-    } else {
-      blocks.forEach(applyOne);
-    }
-
+    } else blocks.forEach(applyOne);
     saveFiles(next);
     setPreviewHtml(buildPreviewHtml(next));
   };
@@ -278,6 +269,7 @@ export default function EditorPage() {
       setAiError("Prompt likho — kya code chahiye");
       return;
     }
+    const model = BLOCKED_MODELS.includes(groqModel) ? "llama-3.1-8b-instant" : groqModel;
     setAiLoading(true);
     try {
       const res = await fetch("/api/groq", {
@@ -285,7 +277,7 @@ export default function EditorPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           apiKey: groqKey.trim(),
-          model: groqModel,
+          model,
           prompt: aiPrompt.trim(),
           fileName: active?.name,
           language: active?.language,
@@ -316,12 +308,7 @@ export default function EditorPage() {
     const id = String(Date.now());
     const next = [
       ...files,
-      {
-        id,
-        name: name.trim(),
-        language: langFromName(name.trim()),
-        content: "",
-      },
+      { id, name: name.trim(), language: langFromName(name.trim()), content: "" },
     ];
     saveFiles(next);
     setActiveId(id);
@@ -344,9 +331,7 @@ export default function EditorPage() {
     const name = prompt("New file name", f.name);
     if (!name?.trim()) return;
     const next = files.map((x) =>
-      x.id === id
-        ? { ...x, name: name.trim(), language: langFromName(name.trim()) }
-        : x
+      x.id === id ? { ...x, name: name.trim(), language: langFromName(name.trim()) } : x
     );
     saveFiles(next);
   };
@@ -478,7 +463,7 @@ export default function EditorPage() {
           {showAi && (
             <aside
               style={{
-                width: 280,
+                width: 300,
                 borderRight: "1px solid #1e293b",
                 background: "#0f172a",
                 display: "flex",
@@ -508,18 +493,22 @@ export default function EditorPage() {
                 }}
               />
 
-              <label style={{ fontSize: 11, color: "#94a3b8" }}>Model</label>
+              <label style={{ fontSize: 11, color: "#94a3b8" }}>
+                Model ({groqModels.length} available)
+              </label>
               <select
                 value={groqModel}
                 onChange={(e) => setGroqModel(e.target.value)}
+                size={Math.min(12, Math.max(6, groqModels.length))}
                 style={{
                   width: "100%",
-                  padding: "0.45rem",
+                  padding: "0.35rem",
                   borderRadius: 6,
                   border: "1px solid #334155",
                   background: "#020617",
                   color: "#e2e8f0",
-                  fontSize: 12,
+                  fontSize: 11,
+                  fontFamily: "ui-monospace, monospace",
                 }}
               >
                 {groqModels.map((m) => (
@@ -530,16 +519,20 @@ export default function EditorPage() {
               </select>
 
               <button style={{ ...btn, background: "#4f46e5", borderColor: "#4f46e5" }} onClick={saveGroqKey}>
-                💾 Save API key & model
+                💾 Save key + load ALL models
               </button>
 
               <button
                 style={{ ...btn, background: "#0ea5e9", borderColor: "#0ea5e9" }}
-                onClick={loadModelsFromGroq}
+                onClick={() => loadModelsFromGroq()}
                 disabled={modelsLoading}
               >
-                {modelsLoading ? "Loading models…" : "↻ Load models from Groq"}
+                {modelsLoading ? "Loading models…" : "↻ Refresh models from Groq API"}
               </button>
+
+              <div style={{ fontSize: 10, color: "#64748b" }}>
+                Endpoints: /api/groq/models · /api/groq → api.groq.com
+              </div>
 
               <label style={{ fontSize: 11, color: "#94a3b8" }}>Prompt</label>
               <textarea
@@ -561,11 +554,7 @@ export default function EditorPage() {
               />
 
               <label style={{ fontSize: 11, color: "#94a3b8", display: "flex", gap: 6, alignItems: "center" }}>
-                <input
-                  type="checkbox"
-                  checked={autoApply}
-                  onChange={(e) => setAutoApply(e.target.checked)}
-                />
+                <input type="checkbox" checked={autoApply} onChange={(e) => setAutoApply(e.target.checked)} />
                 Auto-apply to editor
               </label>
 
@@ -615,11 +604,11 @@ export default function EditorPage() {
               )}
 
               <p style={{ fontSize: 10, color: "#64748b", lineHeight: 1.4 }}>
-                Free key:{" "}
+                Key:{" "}
                 <a href="https://console.groq.com/keys" target="_blank" rel="noreferrer" style={{ color: "#93c5fd" }}>
                   console.groq.com/keys
                 </a>
-                . Key save ke baad <strong>Load models from Groq</strong> dabao.
+                . Save key se saare free + paid models API se load hote hain.
               </p>
             </aside>
           )}
