@@ -19,6 +19,10 @@ export async function GET(req: NextRequest) {
   const response_type = searchParams.get("response_type") || "code";
   const state = searchParams.get("state") || "";
   const provider = searchParams.get("provider") || "";
+  const code_challenge = searchParams.get("code_challenge") || "";
+  const code_challenge_method = searchParams.get("code_challenge_method") || "S256";
+  // resource param (MCP) — accepted, not required for code issue
+  const _resource = searchParams.get("resource") || "";
 
   if (!client_id || !redirect_uri) {
     return NextResponse.json(
@@ -52,12 +56,11 @@ export async function GET(req: NextRequest) {
       {
         error: "invalid_request",
         error_description:
-          "redirect_uri not registered for this client. Use EXACT same URL you saved in OAuth Apps (scheme, host, path).",
+          "redirect_uri not registered for this client. Use EXACT same URL you saved in OAuth Apps.",
         redirect_uri_sent: redirect_uri,
         redirect_uri_normalized: normalizeUri(redirect_uri),
         registered_redirect_uris: app.redirect_uris || [],
         registered_normalized: (app.redirect_uris || []).map(normalizeUri),
-        hint: "Open /oauth/apps → copy the exact redirect URL into authorize?redirect_uri=",
       },
       { status: 400 }
     );
@@ -97,6 +100,8 @@ export async function GET(req: NextRequest) {
     access_token,
     expires_at,
     used: false,
+    code_challenge: code_challenge || null,
+    code_challenge_method: code_challenge ? code_challenge_method : null,
   });
 
   if (error) {
