@@ -35,19 +35,32 @@ export function hashSecret(secret: string) {
   return createHash("sha256").update(secret).digest("hex");
 }
 
+/** Compare redirect URIs: scheme+host+port+path, no trailing slash, no hash */
 export function normalizeUri(uri: string) {
   try {
-    const u = new URL(uri);
+    const u = new URL(uri.trim());
     u.hash = "";
-    return u.toString().replace(/\/$/, "");
+    // drop default ports
+    if (
+      (u.protocol === "https:" && u.port === "443") ||
+      (u.protocol === "http:" && u.port === "80")
+    ) {
+      u.port = "";
+    }
+    let path = u.pathname || "/";
+    if (path.length > 1 && path.endsWith("/")) path = path.slice(0, -1);
+    u.pathname = path;
+    // search kept — if registered without query, request should not add extra
+    return u.origin + u.pathname + (u.search || "");
   } catch {
-    return uri.trim();
+    return uri.trim().replace(/\/$/, "");
   }
 }
 
 export function isRedirectAllowed(app: OAuthApp, redirectUri: string) {
   const target = normalizeUri(redirectUri);
-  return (app.redirect_uris || []).some((r) => normalizeUri(r) === target);
+  const list = app.redirect_uris || [];
+  return list.some((r) => normalizeUri(r) === target);
 }
 
 export async function getAppByClientId(clientId: string) {
