@@ -1,4 +1,8 @@
-# Ads removed
+# Ads (Adsterra)
 
-Google AdSense was removed from the site after a client-side error.
-Re-add later only after a clean AdSense setup and env vars are verified.
+Both Adsterra / profitableratecpmnetwork scripts are loaded site-wide via `app/components/AdsterraScripts.tsx`:
+
+1. https://pl31294407.profitableratecpmnetwork.com/c0/1f/af/c01faf89a732934854ea2bc3bd67ca86.js
+2. https://pl31294406.profitableratecpmnetwork.com/14/ef/72/14ef72e66815063afc90fd99bd4e8e78.js
+
+Loaded with `next/script` strategy=`afterInteractive` in the root layout.

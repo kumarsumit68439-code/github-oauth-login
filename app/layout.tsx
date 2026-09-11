@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { SessionProvider } from "./components/SessionProvider";
 import Navbar from "./components/Navbar";
+import AdsterraScripts from "./components/AdsterraScripts";
 import "./globals.css";
 
 export const metadata: Metadata = {
@@ -19,6 +20,7 @@ export default function RootLayout({
         <SessionProvider>
           <Navbar />
           <main className="fade-up">{children}</main>
+          <AdsterraScripts />
         </SessionProvider>
       </body>
     </html>

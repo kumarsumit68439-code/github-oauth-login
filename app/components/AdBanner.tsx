@@ -1,4 +1,4 @@
-// Ads removed — placeholder kept empty to avoid import errors if cached.
+// Placeholder for banner-style ads (kept for compatibility)
 export default function AdBanner() {
   return null;
 }
