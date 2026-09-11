@@ -4,8 +4,8 @@ import Navbar from "./components/Navbar";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "OAuth App — GitHub & Google",
-  description: "Login with GitHub or Google OAuth",
+  title: "OAuth + MCP Platform",
+  description: "Google/GitHub OAuth provider, MCP for ChatGPT, project builder",
 };
 
 export default function RootLayout({
@@ -18,7 +18,7 @@ export default function RootLayout({
       <body>
         <SessionProvider>
           <Navbar />
-          {children}
+          <main className="fade-up">{children}</main>
         </SessionProvider>
       </body>
     </html>
