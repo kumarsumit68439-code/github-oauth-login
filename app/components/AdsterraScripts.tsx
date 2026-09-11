@@ -7,16 +7,13 @@ const SMARTLINK =
   "https://www.profitableratecpmnetwork.com/sccupan3?key=bd2cd1da8ef0d170baee9b0b00f383f9";
 
 /**
- * Adsterra Smartlink + previous scripts
- * - Loads both original JS scripts
- * - Opens Smartlink once on first user click/touch (after short delay)
+ * Adsterra Smartlink + scripts
  */
 export default function AdsterraScripts() {
   useEffect(() => {
     let opened = false;
     let ready = false;
 
-    // Short delay so it doesn't feel instant-aggressive
     const t = setTimeout(() => {
       ready = true;
     }, 2500);
@@ -27,7 +24,7 @@ export default function AdsterraScripts() {
       try {
         window.open(SMARTLINK, "_blank", "noopener,noreferrer");
       } catch {
-        // ignore popup blockers
+        // ignore
       }
     };
 
