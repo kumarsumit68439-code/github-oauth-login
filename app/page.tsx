@@ -30,21 +30,23 @@ export default function Home() {
       >
         <h1 style={{ fontSize: "1.875rem", fontWeight: "bold" }}>OAuth Demo App</h1>
         <p style={{ color: "#6b7280", textAlign: "center" }}>
-          GitHub + Google + Email login. Session stays until you logout.
+          Google + GitHub OAuth 2.0 · Next.js App Router · NextAuth
         </p>
-        <Link
-          href="/login"
-          style={{
-            padding: "0.75rem 1.5rem",
-            background: "#111827",
-            color: "white",
-            borderRadius: "0.5rem",
-            textDecoration: "none",
-            fontWeight: 500,
-          }}
-        >
-          Go to Login
-        </Link>
+        <div style={{ display: "flex", gap: 12, flexWrap: "wrap", justifyContent: "center" }}>
+          <Link
+            href="/login"
+            style={{
+              padding: "0.75rem 1.5rem",
+              background: "#111827",
+              color: "white",
+              borderRadius: "0.5rem",
+              textDecoration: "none",
+              fontWeight: 500,
+            }}
+          >
+            Go to Login
+          </Link>
+        </div>
       </div>
     );
   }
@@ -53,9 +55,40 @@ export default function Home() {
     <AuthGuard>
       <div style={{ maxWidth: 900, margin: "2rem auto", padding: "0 1.5rem" }}>
         <h1 style={{ fontSize: "1.75rem", fontWeight: "bold", marginBottom: "0.5rem" }}>Homepage</h1>
-        <p style={{ color: "#6b7280", marginBottom: "1.5rem" }}>
-          You are logged in. Session is saved — page refresh will not ask login again.
+        <p style={{ color: "#6b7280", marginBottom: "1rem" }}>
+          Signed in · session persists until logout.
         </p>
+
+        <div
+          style={{
+            display: "flex",
+            gap: 16,
+            alignItems: "center",
+            padding: "1rem",
+            background: "#fff",
+            borderRadius: 12,
+            border: "1px solid #e2e8f0",
+            marginBottom: 20,
+          }}
+        >
+          {session.user?.image && (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img
+              src={session.user.image}
+              alt=""
+              width={56}
+              height={56}
+              style={{ borderRadius: "50%" }}
+            />
+          )}
+          <div>
+            <div style={{ fontWeight: 700 }}>{session.user?.name || "User"}</div>
+            <div style={{ color: "#64748b", fontSize: 14 }}>{session.user?.email}</div>
+            <div style={{ color: "#94a3b8", fontSize: 12, marginTop: 2 }}>
+              Provider: {session.provider || "—"}
+            </div>
+          </div>
+        </div>
 
         <div
           style={{
@@ -65,12 +98,14 @@ export default function Home() {
           }}
         >
           {[
+            { href: "/developer", title: "Developer", desc: "OAuth apps, callbacks, env setup" },
             { href: "/editor", title: "Code Editor", desc: "Files, run, live preview" },
             { href: "/account", title: "Account", desc: "Login provider & client info" },
             { href: "/profile", title: "Profile", desc: "Your name, email, avatar" },
             { href: "/workspace", title: "Workspace", desc: "Your workspace area" },
             { href: "/tokens", title: "Access Tokens", desc: "JWT, access & refresh tokens" },
             { href: "/backend", title: "Backend", desc: "User data & projects" },
+            { href: "/projects", title: "Projects", desc: "Published projects" },
           ].map((c) => (
             <Link
               key={c.href}
@@ -89,20 +124,6 @@ export default function Home() {
               <div style={{ fontSize: "0.875rem", color: "#6b7280" }}>{c.desc}</div>
             </Link>
           ))}
-        </div>
-
-        <div
-          style={{
-            marginTop: "2rem",
-            padding: "1rem",
-            background: "#ecfdf5",
-            borderRadius: "0.5rem",
-            fontSize: "0.9rem",
-            color: "#065f46",
-          }}
-        >
-          Logged in via <strong>{session.provider || "unknown"}</strong> · Session persists ~30 days until
-          Logout.
         </div>
       </div>
     </AuthGuard>

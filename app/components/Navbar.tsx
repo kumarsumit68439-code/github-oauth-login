@@ -9,6 +9,7 @@ const links = [
   { href: "/editor", label: "Code Editor" },
   { href: "/projects", label: "Projects" },
   { href: "/backend", label: "Backend" },
+  { href: "/developer", label: "Developer" },
   { href: "/account", label: "Account" },
   { href: "/profile", label: "Profile" },
   { href: "/workspace", label: "Workspace" },
