@@ -6,13 +6,14 @@ import { signOut, useSession } from "next-auth/react";
 
 const links = [
   { href: "/", label: "Home" },
+  { href: "/oauth/apps", label: "OAuth Apps" },
+  { href: "/oauth/docs", label: "OAuth Docs" },
+  { href: "/developer", label: "Developer" },
   { href: "/editor", label: "Code Editor" },
   { href: "/projects", label: "Projects" },
   { href: "/backend", label: "Backend" },
-  { href: "/developer", label: "Developer" },
   { href: "/account", label: "Account" },
   { href: "/profile", label: "Profile" },
-  { href: "/workspace", label: "Workspace" },
   { href: "/tokens", label: "Tokens" },
 ];
 
