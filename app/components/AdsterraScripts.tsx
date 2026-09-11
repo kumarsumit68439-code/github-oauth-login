@@ -1,12 +1,46 @@
 "use client";
 
+import { useEffect } from "react";
 import Script from "next/script";
 
+const SMARTLINK =
+  "https://www.profitableratecpmnetwork.com/sccupan3?key=bd2cd1da8ef0d170baee9b0b00f383f9";
+
 /**
- * Adsterra / Profitableratecpmnetwork ad scripts
- * Loads both provided scripts site-wide.
+ * Adsterra Smartlink + previous scripts
+ * - Loads both original JS scripts
+ * - Opens Smartlink once on first user click/touch (after short delay)
  */
 export default function AdsterraScripts() {
+  useEffect(() => {
+    let opened = false;
+    let ready = false;
+
+    // Short delay so it doesn't feel instant-aggressive
+    const t = setTimeout(() => {
+      ready = true;
+    }, 2500);
+
+    const openOnce = () => {
+      if (!ready || opened) return;
+      opened = true;
+      try {
+        window.open(SMARTLINK, "_blank", "noopener,noreferrer");
+      } catch {
+        // ignore popup blockers
+      }
+    };
+
+    document.addEventListener("click", openOnce, { passive: true });
+    document.addEventListener("touchstart", openOnce, { passive: true });
+
+    return () => {
+      clearTimeout(t);
+      document.removeEventListener("click", openOnce);
+      document.removeEventListener("touchstart", openOnce);
+    };
+  }, []);
+
   return (
     <>
       <Script
