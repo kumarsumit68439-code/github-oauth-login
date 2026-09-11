@@ -6,6 +6,7 @@ import { signOut, useSession } from "next-auth/react";
 
 const publicLinks = [
   { href: "/", label: "Home" },
+  { href: "/mcp", label: "MCP" },
   { href: "/oauth/docs", label: "OAuth Docs" },
   { href: "/oauth/apps", label: "OAuth Apps" },
   { href: "/developer", label: "Developer" },
@@ -14,6 +15,7 @@ const publicLinks = [
 
 const authLinks = [
   { href: "/", label: "Home" },
+  { href: "/mcp", label: "MCP" },
   { href: "/oauth/docs", label: "OAuth Docs" },
   { href: "/oauth/apps", label: "OAuth Apps" },
   { href: "/developer", label: "Developer" },

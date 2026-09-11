@@ -4,10 +4,11 @@ import { useSession } from "next-auth/react";
 import Link from "next/link";
 
 const ALL_PAGES = [
-  { href: "/oauth/docs", title: "OAuth Docs", desc: "Endpoints, curl, flow for other websites", public: true },
-  { href: "/oauth/apps", title: "OAuth Apps", desc: "Create client_id + client_secret", public: false },
-  { href: "/developer", title: "Developer", desc: "Google/GitHub callbacks & env setup", public: false },
-  { href: "/login", title: "Login", desc: "Google, GitHub, Email, Facebook", public: true },
+  { href: "/mcp", title: "MCP Server", desc: "ChatGPT MCP URL + all discovery endpoints", public: true },
+  { href: "/oauth/docs", title: "OAuth Docs", desc: "Authorize, token, curl examples", public: true },
+  { href: "/oauth/apps", title: "OAuth Apps", desc: "Create client_id + client_secret", public: true },
+  { href: "/developer", title: "Developer", desc: "Google/GitHub callbacks & env", public: true },
+  { href: "/login", title: "Login", desc: "Google, GitHub, Email", public: true },
   { href: "/editor", title: "Code Editor", desc: "Files, AI, live preview", public: false },
   { href: "/projects", title: "Projects", desc: "Published projects", public: false },
   { href: "/backend", title: "Backend", desc: "User data & projects", public: false },
@@ -28,32 +29,34 @@ export default function Home() {
     );
   }
 
-  const pages = session ? ALL_PAGES : ALL_PAGES.filter((p) => p.public || p.href === "/oauth/apps" || p.href === "/developer");
+  // Always show ALL pages so everything is visible; protected ones still need login when opened
+  const pages = ALL_PAGES;
 
   return (
     <div style={{ maxWidth: 960, margin: "0 auto", padding: "2rem 1.25rem 3rem" }}>
       <h1 style={{ fontSize: "1.85rem", fontWeight: 800, marginBottom: 8 }}>
-        {session ? "Homepage" : "OAuth Platform"}
+        {session ? "Homepage" : "OAuth + MCP Platform"}
       </h1>
-      <p style={{ color: "#64748b", marginBottom: 20, lineHeight: 1.55 }}>
-        {session
-          ? "Saare pages available hain — niche se open karo."
-          : "Dusri websites ke liye Google / GitHub login provider. Docs public hain; Apps ke liye login karo."}
+      <p style={{ color: "#64748b", marginBottom: 16, lineHeight: 1.55 }}>
+        Saare pages yahan listed hain — navbar se bhi open ho sakte hain.
       </p>
 
-      {!session && (
-        <div style={{ display: "flex", gap: 10, flexWrap: "wrap", marginBottom: 24 }}>
-          <Link href="/login" style={btnPrimary}>
+      <div style={{ display: "flex", gap: 10, flexWrap: "wrap", marginBottom: 22 }}>
+        <Link href="/mcp" style={btnPrimary}>
+          MCP Server
+        </Link>
+        <Link href="/oauth/docs" style={btnSecondary}>
+          OAuth Docs
+        </Link>
+        <Link href="/oauth/apps" style={btnSecondary}>
+          OAuth Apps
+        </Link>
+        {!session && (
+          <Link href="/login" style={btnSecondary}>
             Sign in
           </Link>
-          <Link href="/oauth/docs" style={btnSecondary}>
-            OAuth Docs
-          </Link>
-          <Link href="/oauth/apps" style={btnSecondary}>
-            OAuth Apps
-          </Link>
-        </div>
-      )}
+        )}
+      </div>
 
       {session && (
         <div
@@ -111,21 +114,13 @@ export default function Home() {
       </div>
 
       <div style={{ marginTop: 28, fontSize: 13, color: "#64748b" }}>
-        <strong>Quick links:</strong>{" "}
-        <Link href="/oauth/docs" style={{ color: "#4f46e5" }}>
-          /oauth/docs
-        </Link>
+        <strong>MCP:</strong>{" "}
+        <a href="https://github-oauth-login-nine.vercel.app/api/mcp" style={{ color: "#4f46e5" }}>
+          /api/mcp
+        </a>
         {" · "}
-        <Link href="/oauth/apps" style={{ color: "#4f46e5" }}>
-          /oauth/apps
-        </Link>
-        {" · "}
-        <Link href="/developer" style={{ color: "#4f46e5" }}>
-          /developer
-        </Link>
-        {" · "}
-        <Link href="/login" style={{ color: "#4f46e5" }}>
-          /login
+        <Link href="/mcp" style={{ color: "#4f46e5" }}>
+          /mcp
         </Link>
       </div>
     </div>
